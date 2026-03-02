@@ -1,8 +1,19 @@
-const CACHE = 'money-ledger-v1';
-const ASSETS = ['./', './index.html'];
+const CACHE = 'money-ledger-v2';
+const BASE = self.location.pathname.replace('sw.js', '');
+const ASSETS = [
+  BASE,
+  BASE + 'index.html',
+  BASE + 'manifest.json'
+];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE).then(c => {
+      return Promise.all(ASSETS.map(url =>
+        fetch(url).then(res => c.put(url, res)).catch(() => {})
+      ));
+    })
+  );
   self.skipWaiting();
 });
 
@@ -15,6 +26,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./index.html')))
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request).then(r => r || caches.match(BASE + 'index.html')))
   );
 });
